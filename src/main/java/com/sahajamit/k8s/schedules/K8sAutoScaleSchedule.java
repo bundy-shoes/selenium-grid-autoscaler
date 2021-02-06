@@ -20,6 +20,7 @@ public class K8sAutoScaleSchedule {
     @Scheduled(fixedDelayString = "${grid_scale_check_frequency_in_sec:10}000", initialDelay = 5000)
     public synchronized void checkAndAutoScale() {
         try {
+            logger.info("rotem");
             podScalingService.adjustScale(service.getStatus());
         } catch (Exception e) {
             logger.error("Error in running checkAndAutoScale scheduler: {}", e);
