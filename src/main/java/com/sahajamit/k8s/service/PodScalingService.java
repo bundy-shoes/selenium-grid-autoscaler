@@ -23,17 +23,17 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class PodScalingService {
     private static final TrustManager[] UNQUESTIONING_TRUST_MANAGER = new TrustManager[]{
-            new X509TrustManager() {
-                public X509Certificate[] getAcceptedIssuers() {
-                    return null;
-                }
-
-                public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                }
-
-                public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                }
+        new X509TrustManager() {
+            public X509Certificate[] getAcceptedIssuers() {
+                return null;
             }
+
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+            }
+
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+            }
+        }
     };
     private static final Logger logger = LoggerFactory.getLogger(PodScalingService.class);
     @Value("${gridUrl}")
@@ -51,8 +51,8 @@ public class PodScalingService {
     private OkHttpClient httpClient;
 
     @PostConstruct
-    private void init() throws NoSuchAlgorithmException, KeyManagementException {
-        logger.info("Grid Console URL: {}", gridUrl);
+    private void init() throws NoSuchAlgorithmException, KeyManagementException {        logger.info("Grid Console URL: {}", gridUrl);
+        logger.info("Grid Console URL: {}", gridUrl);    
         logger.info("K8s API URL: {}", k8sApiUrl);
         httpClient = new OkHttpClient();
         SSLContext sc = SSLContext.getInstance("SSL");
@@ -87,12 +87,16 @@ public class PodScalingService {
     private void scale(int scaledValue) throws IOException, InterruptedException {
         MediaType JSON = MediaType.parse("application/strategic-merge-patch+json");
         String payload = String.format("{ \"spec\": { \"replicas\": %s } }", scaledValue);
+        
+        logger.info(String.format("url: %s", k8sApiUrl));
+        RequestBody body = RequestBody.create(JSON, payload);
+          
         Request r = new Request.Builder()
                 .url(k8sApiUrl)
                 .header("Authorization", "Bearer " + k8sToken)
                 .header("Accept", "application/json")
                 .header("Content-Type", "application/strategic-merge-patch+json")
-                .patch(RequestBody.create(JSON, payload))
+                .patch(body)
                 .build();
         Call call = httpClient.newCall(r);
         Response response = call.execute();
