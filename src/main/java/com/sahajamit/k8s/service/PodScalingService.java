@@ -120,24 +120,34 @@ public class PodScalingService {
 
     public void adjustScale(GridConsoleStatus gridStatus) throws IOException, InterruptedException {
         logger.debug("Let's check if auto-scaling is required...");
-        int totalRunningNodes = gridStatus.getAvailableNodesCount() + gridStatus.getBusyNodesCount();
-        int queuedRequests = gridStatus.getWaitingRequestsCount();
-        int currentScale = getScale();
-        int requiredScale;
-        if (queuedRequests > 0) {
-            requiredScale = totalRunningNodes + queuedRequests;
-            logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
-        } else if (totalRunningNodes < minScaleLimit) {
-            requiredScale = minScaleLimit;
-            logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
-        } else if (totalRunningNodes > minScaleLimit && gridStatus.getBusyNodesCount() == 0) {
-            logger.info("Scale down is required. Current available scale: {} and minimum required scale: {}", currentScale, minScaleLimit);
-            requiredScale = minScaleLimit;
-        } else {
-            logger.debug("No scaling is required..");
-            return;
+        //int totalRunningNodes = gridStatus.getAvailableNodesCount() + gridStatus.getBusyNodesCount();
+        //int queuedRequests = gridStatus.getWaitingRequestsCount();
+        //int currentScale = getScale();
+        //int requiredScale;
+        //if (queuedRequests > 0) {
+        //    requiredScale = totalRunningNodes + queuedRequests;
+        //    logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
+        // } else if (totalRunningNodes < minScaleLimit) {
+        //     requiredScale = minScaleLimit;
+        //     logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
+        // } else if (totalRunningNodes > minScaleLimit && gridStatus.getBusyNodesCount() == 0) {
+        //     logger.info("Scale down is required. Current available scale: {} and minimum required scale: {}", currentScale, minScaleLimit);
+        //     requiredScale = minScaleLimit;
+        // } else {
+        //     logger.debug("No scaling is required..");
+        //     return;
+        // }
+
+        int maxSession=gridStatus.getMaxSession();
+        int sessionCount=gridStatus.getSessionCount();
+        int scale = minScaleLimit;
+
+        if(maxSession - sessionCount == 0) {
+            scale = maxSession+1;
+            updateScale(scale);
+
         }
-        updateScale(requiredScale);
+        return;    
     }
 
     public void cleanUp() throws IOException, InterruptedException {
@@ -148,13 +158,13 @@ public class PodScalingService {
 
     private void waitForScaleToHappen(int scale) throws IOException, InterruptedException {
         GridConsoleStatus gridStatus = gridStatusService.getStatus();
-        int existingScale = gridStatus.getAvailableNodesCount() + gridStatus.getBusyNodesCount();
+        int existingScale = gridStatus.getMaxSession();
         while (existingScale != scale) {
             int pollingTime = 5;
             logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}", pollingTime, existingScale, scale);
             TimeUnit.SECONDS.sleep(pollingTime);
             gridStatus = gridStatusService.getStatus();
-            existingScale = gridStatus.getAvailableNodesCount() + gridStatus.getBusyNodesCount();
+            existingScale = gridStatus.getMaxSession();
         }
         logger.info("Selenium Grid is successfully scaled to {}", scale);
     }

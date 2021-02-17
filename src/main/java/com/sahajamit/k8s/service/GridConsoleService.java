@@ -1,16 +1,17 @@
 package com.sahajamit.k8s.service;
 
 import com.sahajamit.k8s.domain.GridConsoleStatus;
-import org.apache.commons.httpclient.HttpClient;
-import org.apache.commons.httpclient.HttpMethod;
-import org.apache.commons.httpclient.methods.GetMethod;
+import com.squareup.okhttp.*;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
 
 @Service
 public class GridConsoleService {
@@ -18,36 +19,73 @@ public class GridConsoleService {
     @Value("${gridUrl}")
     private String gridUrl;
 
-    private HttpClient client = new HttpClient();
+    private OkHttpClient httpClient;
 
-    private String availableNode = "img src='/grid/resources/org/openqa/grid/images/chrome.png' width='16' height='16' title";
-    private String busyNode = "img src='/grid/resources/org/openqa/grid/images/chrome.png' width='16' height='16' class='busy' ";
-    private Pattern pendingRequests = Pattern.compile("\\d{1,} requests waiting for a slot to be free");
+    private static final Logger logger = LoggerFactory.getLogger(PodScalingService.class);
 
+   
     public GridConsoleStatus getStatus() throws IOException {
-        HttpMethod method = new GetMethod(gridUrl);
-        client.executeMethod(method);
-        String htmlContent = method.getResponseBodyAsString();
-
         GridConsoleStatus status = new GridConsoleStatus();
+        try
+        {
+            httpClient = new OkHttpClient();
+            JSONObject json = new JSONObject();
 
-
-        int availableNodesCount = StringUtils.countOccurrencesOf(htmlContent, availableNode);
-        status.setAvailableNodesCount(availableNodesCount);
-
-
-        int busyNodesCount = StringUtils.countOccurrencesOf(htmlContent, busyNode);
-        status.setBusyNodesCount(busyNodesCount);
-
-
-        int waitingRequestsCount = 0;
-        Matcher matcher = pendingRequests.matcher(htmlContent);
-        if (matcher.find()) {
-            waitingRequestsCount = Integer.parseInt(matcher.group().split(" ")[0]);
+            String grapql="query GetNodes {  nodesInfo {    nodes {      id      uri      status      maxSession      slotCount      stereotypes      version      sessionCount      osInfo {        version        name        arch        __typename      }      __typename    }    __typename  }}";
+            
+            json.put("query", grapql);
+            json.put("variables", new JSONObject());
+ 
+            RequestBody body = RequestBody.create(null, json.toString());
+            gridUrl="http://bundy-grid.com:30000/graphql";
+            Request r = new Request.Builder()
+                    .url(gridUrl)
+                    .header("Accept", "application/json")
+                    .header("Content-Type", "application/json")
+                    .post(body)                    
+                    .build();
+            Call call = httpClient.newCall(r);
+            Response response = call.execute();
+            String jsonString = response.body().string();
+            JSONObject jsonObject = new JSONObject(jsonString);                        
+            JSONArray nodes = jsonObject.getJSONObject("data").getJSONObject("nodesInfo").getJSONArray("nodes");                                            
+            int sessionCount = 0;
+            int maxSession = 0;
+            for(Object node: nodes){
+                if (node instanceof JSONObject ) {
+                    JSONObject x = (JSONObject) node;
+                    sessionCount +=  (int)x.get("sessionCount");
+                    maxSession +=  (int)x.get("maxSession");                    
+                }
+            }            
+            status.setSessionCount(sessionCount);
+            status.setMaxSession(maxSession);
         }
-        status.setWaitingRequestsCount(waitingRequestsCount);
-
+        catch (Exception e)
+        {
+            logger.error(e.getMessage());
+        }
         return status;
+ 
+         
+   
+     
+
+
+        // int busyNodesCount = StringUtils.countOccurrencesOf(htmlContent, busyNode);
+        // status.setBusyNodesCount(busyNodesCount);
+
+
+        // int waitingRequestsCount = 0;
+        // Matcher matcher = pendingRequests.matcher(htmlContent);
+        // if (matcher.find()) {
+        //     waitingRequestsCount = Integer.parseInt(matcher.group().split(" ")[0]);
+        // }
+        // status.setWaitingRequestsCount(waitingRequestsCount);
+
+        // return status;
     }
 
 }
+
+ 
