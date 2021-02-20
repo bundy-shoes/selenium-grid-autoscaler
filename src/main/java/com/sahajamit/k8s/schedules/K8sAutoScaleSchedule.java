@@ -18,6 +18,16 @@ public class K8sAutoScaleSchedule {
     private PodScalingService podScalingService;
 
     @Scheduled(fixedDelayString = "${grid_scale_check_frequency_in_sec:10}000", initialDelay = 5000)
+    public synchronized void refreshNodes() {
+        try {
+            service.getStatus();
+             
+        } catch (Exception e) {
+            logger.error("Error in running checkAndAutoScale scheduler: {}", e);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${grid_scale_check_frequency_in_sec:10}000", initialDelay = 5000)
     public synchronized void checkAndAutoScale() {
         try {
             podScalingService.adjustScale(service.getStatus());
