@@ -13,6 +13,8 @@ import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.TimeZone;
 
+import javax.annotation.PostConstruct;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,13 +37,21 @@ public class GridConsoleService {
     @Value("${gridPath}")
     private String gridPath;
     
-    private OkHttpClient httpClient = new OkHttpClient();
+    private OkHttpClient httpClient;
 
     private static final Logger logger = LoggerFactory.getLogger(PodScalingService.class);
-    
+
     @Value("${max_session_timeout}")
     private Long MAX_SESSION_TIMEOUT;
 
+    @PostConstruct
+    private void init(){      
+        logger.info("Grid Console URL: {}", gridUrl);
+        logger.info("Grid Graphql URL: {}", graphql);    
+        logger.info("Grid API Path", gridPath);
+        httpClient = new OkHttpClient();
+    }
+    
     public Response drain(String nodeUri, String nodeId) throws IOException {
         Response response = null;
         try {
@@ -57,7 +67,7 @@ public class GridConsoleService {
                     .build();
             response = httpClient.newCall(r).execute();
         } catch (Exception e) {
-            logger.error(e.getMessage());
+            logger.error(String.format("#GridConsoleStatus, drain %s", e.getMessage()));
         }
         return response;
     }
@@ -71,13 +81,26 @@ public class GridConsoleService {
                     .header("X-REGISTRATION-SECRET", "")
                     .delete()
                     .build();
+            logger.info(String.format("terminating %s for node %s", sessionId, nodeUri));        
             response = httpClient.newCall(r).execute();
+            logger.info(String.format("%s terminated for node %s", sessionId, nodeUri));
         } catch (Exception e) {
-            logger.error(e.getMessage());
+            logger.error(String.format("#GridConsoleStatus, deleteSession %s", e.getMessage()));
         }
         return response;
     }
-    
+
+    public JSONArray getNodes(JSONObject obj) {
+        JSONArray nodes = new JSONArray();        
+        try {
+            nodes = obj.getJSONObject("data").getJSONObject("nodesInfo").getJSONArray("nodes");
+        }
+        catch(Exception e){
+            logger.error(String.format("#GridConsoleStatus, getNodes %s", e.getMessage()));
+        }
+        return nodes;
+    }
+
     public GridConsoleStatus getStatus() throws IOException {
         GridConsoleStatus status = new GridConsoleStatus();
         try {
@@ -96,11 +119,10 @@ public class GridConsoleService {
             Response response = call.execute();
             String jsonString = response.body().string();
             JSONObject jsonObject = new JSONObject(jsonString);
-            JSONArray nodes = jsonObject.getJSONObject("data")
-                                        .getJSONObject("nodesInfo")
-                                        .getJSONArray("nodes");
+            JSONArray nodes = getNodes(jsonObject);
             int sessionCount = 0;
             int maxSession = 0;
+            int slotCount = 0;
             for (Object nodeIter : nodes) {
                 if (nodeIter instanceof JSONObject) {
                     JSONObject node = (JSONObject) nodeIter;
@@ -125,24 +147,26 @@ public class GridConsoleService {
                             if(diff > MAX_SESSION_TIMEOUT){
                                deleteSession(nodeUri, sessionId);
                             }
-                            logger.info("diff", diff);
+                            logger.info(String.format("diff: %s", diff/1000/60));
                         } catch (ParseException e) {
                             e.printStackTrace();
                         } catch (IOException e) {
                             e.printStackTrace();
                         }
-
+ 
                     });                    
                     sessionCount +=  (int)node.get("sessionCount");
-                    maxSession +=  (int)node.get("maxSession");                    
+                    slotCount += (int)node.get("slotCount");                    
+                    maxSession +=  (int)node.get("maxSession"); 
                 }
             }            
             status.setSessionCount(sessionCount);
             status.setMaxSession(maxSession);
+            status.setSlotCount(slotCount);
         }
         catch (Exception e)
         {
-            logger.error(e.getMessage());
+            logger.error(String.format("#GridConsoleStatus, getStatus %s", e.getMessage()));
         }
         return status;
     }

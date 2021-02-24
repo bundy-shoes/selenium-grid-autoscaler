@@ -9,13 +9,14 @@ public class GridConsoleStatus {
 	
 	private int sessionCount;
     private int maxSession;
+    private int slotCount;
 
 	public int getSessionCount() {
 		return sessionCount;
 	}
 
 	public void setSessionCount(int _sessionCount) {
-		this.sessionCount = _sessionCount;
+		sessionCount = _sessionCount;
 	}
 
 	public int getMaxSession() {
@@ -23,9 +24,16 @@ public class GridConsoleStatus {
 	}
 
 	public void setMaxSession(int _maxSession) {
-		this.maxSession = _maxSession;
+		maxSession = _maxSession;
 	}
 
+	public void setSlotCount(int _slotCount) {
+		slotCount = _slotCount;
+	}
+
+	public int getSlotCount() {
+		return slotCount;
+	}
     // private int availableNodesCount;
     // private int busyNodesCount;
     // private int waitingRequestsCount;

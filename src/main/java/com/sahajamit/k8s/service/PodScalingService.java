@@ -51,7 +51,7 @@ public class PodScalingService {
     private OkHttpClient httpClient;
 
     @PostConstruct
-    private void init() throws NoSuchAlgorithmException, KeyManagementException {        logger.info("Grid Console URL: {}", gridUrl);
+    private void init() throws NoSuchAlgorithmException, KeyManagementException {   
         logger.info("Grid Console URL: {}", gridUrl);    
         logger.info("K8s API URL: {}", k8sApiUrl);
         httpClient = new OkHttpClient();
@@ -144,7 +144,6 @@ public class PodScalingService {
         if(maxSession - sessionCount == 0) {
             scale = maxSession+1;
             updateScale(scale);
-
         }
         return;    
     }
