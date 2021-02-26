@@ -133,7 +133,7 @@ public class GridConsoleService {
                         String nodeUri = session.get("nodeUri").toString();
                         String startTimeStr = session.get("startTime").toString();
                         try {
-                            SimpleDateFormat isoFormat = new SimpleDateFormat("dd/MM/yyyy hh:mm:ss");
+                            SimpleDateFormat isoFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
                             Calendar c = Calendar.getInstance();
                             LocalDateTime dt = LocalDateTime.now();
                             TimeZone tz = c.getTimeZone();
