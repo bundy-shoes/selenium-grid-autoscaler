@@ -64,19 +64,6 @@ public class PodScalingService {
         httpClient.setSslSocketFactory(sc.getSocketFactory());
     }
 
-    // private int getScale() throws IOException {
-    //     Request r = new Request.Builder()
-    //             .url(k8sApiUrl)
-    //             .header("Authorization", "Bearer " + k8sToken)
-    //             .get()
-    //             .build();
-    //     Call call = httpClient.newCall(r);
-    //     Response response = call.execute();
-    //     String htmlContent = response.body().string();
-    //     JSONObject jsonObject = new JSONObject(htmlContent);
-    //     return jsonObject.getJSONObject("status").getInt("replicas");
-    // }
-
     private void updateScale(int scaledValue) throws IOException, InterruptedException {
         if (scaledValue > maxScaleLimit)
             logger.warn("Scale required {} which is more than the max scale limit of {}. Hence no auto-scaling is performed.", scaledValue, maxScaleLimit);
