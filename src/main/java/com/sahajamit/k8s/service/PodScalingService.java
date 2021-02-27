@@ -54,6 +54,9 @@ public class PodScalingService {
     private void init() throws NoSuchAlgorithmException, KeyManagementException {   
         logger.info("Grid Console URL: {}", gridUrl);    
         logger.info("K8s API URL: {}", k8sApiUrl);
+        logger.info("K8s API Token: {}", k8sToken);
+
+        
         httpClient = new OkHttpClient();
         SSLContext sc = SSLContext.getInstance("SSL");
         sc.init(null, UNQUESTIONING_TRUST_MANAGER, null);
@@ -166,5 +169,9 @@ public class PodScalingService {
         }
         logger.info("Selenium Grid is successfully scaled to {}", scale);
     }
+
+
+
+	
 
 }
