@@ -124,16 +124,16 @@ public class PodScalingService {
             updateScale(minScaleLimit);
         }           
         else if (maxSession - sessionCount == 0) { // no available nodes
-            downCounter = 0;
+            downCounter = 0; //init downscale count
             if (sessionQueueSize > 0) { // requests are waiting in queue
-                if (upCounter++ == Math.round(scaleUpTimeout / initialDelay)) {
+                if (++upCounter == Math.round(scaleUpTimeout / initialDelay)) {
                     upCounter = 0;                    
                     updateScale(maxSession+1);
                 }
             }
         } else if (sessionQueueSize == 0) { // no requests are waiting in queue
-            upCounter = 0;
-            if (downCounter++ == Math.round(scaleDownTimeout / initialDelay)) {
+            upCounter = 0; //init upscale count
+            if (++downCounter == Math.round(scaleDownTimeout / initialDelay)) {
                 downCounter = 0;                
                 updateScale(Math.max(minScaleLimit, maxSession-1));
             }
