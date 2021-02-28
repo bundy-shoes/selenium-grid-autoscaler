@@ -1,6 +1,5 @@
 package com.sahajamit.k8s.schedules;
 
-import com.sahajamit.k8s.domain.GridConsoleStatus;
 import com.sahajamit.k8s.service.GridConsoleService;
 import com.sahajamit.k8s.service.PodScalingService;
 import org.slf4j.Logger;
@@ -21,11 +20,18 @@ public class K8sAutoScaleSchedule {
     @Scheduled(fixedDelayString = "${grid_scale_check_frequency_in_sec:10}000", initialDelay = 5000)
     public synchronized void checkAndAutoScale() {
         try {
-            GridConsoleStatus status = service.getStatus();
-            service.utilize(status);
-            podScalingService.adjustScale(5000, status);
+            podScalingService.adjustScale(5000, service.getStatus());
         } catch (Exception e) {
             logger.error("Error in running checkAndAutoScale scheduler: {}", e);
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${grid_utilize_check_frequency_in_sec:10}000", initialDelay = 30000)
+    public synchronized void checkAndUtilize() {
+        try {
+            service.utilize(service.getStatus());
+        } catch (Exception e) {
+            logger.error("Error in running checkAndUtilize scheduler: {}", e);
         }
     }
 

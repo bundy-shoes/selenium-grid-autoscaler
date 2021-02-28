@@ -120,22 +120,29 @@ public class PodScalingService {
         int maxSession = gridStatus.getMaxSession();
         int sessionCount = gridStatus.getSessionCount();
         int sessionQueueSize = gridStatus.getSessionQueueSize();
+        
         if(maxSession < minScaleLimit){
             updateScale(minScaleLimit);
-        }           
-        else if (maxSession - sessionCount == 0) { // no available nodes
+            return;
+        }         
+
+       if (maxSession - sessionCount == 0) { // no available nodes
             downCounter = 0; //init downscale count
             if (sessionQueueSize > 0) { // requests are waiting in queue
                 if (++upCounter == Math.round(scaleUpTimeout / initialDelay)) {
                     upCounter = 0;                    
                     updateScale(maxSession+1);
+                    return;
                 }
             }
-        } else if (sessionQueueSize == 0) { // no requests are waiting in queue
+        } 
+    
+        if (sessionQueueSize == 0) { // no requests are waiting in queue
             upCounter = 0; //init upscale count
             if (++downCounter == Math.round(scaleDownTimeout / initialDelay)) {
                 downCounter = 0;                
                 updateScale(Math.max(minScaleLimit, maxSession-1));
+                return;
             }
         }        
     }

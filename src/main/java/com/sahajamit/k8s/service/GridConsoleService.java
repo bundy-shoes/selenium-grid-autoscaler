@@ -2,17 +2,7 @@ package com.sahajamit.k8s.service;
 
 import com.sahajamit.k8s.domain.GridConsoleStatus;
 import com.squareup.okhttp.*;
-
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.util.Date;
 import java.util.List;
-import java.util.TimeZone;
 import java.util.Map.Entry;
 
 import javax.annotation.PostConstruct;
