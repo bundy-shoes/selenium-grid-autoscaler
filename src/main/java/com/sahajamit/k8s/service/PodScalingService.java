@@ -120,11 +120,7 @@ public class PodScalingService {
         int maxSession = gridStatus.getMaxSession();
         int sessionCount = gridStatus.getSessionCount();
         int sessionQueueSize = gridStatus.getSessionQueueSize();
-        if (maxSession == minScaleLimit){
-            upCounter = 0;
-            downCounter = 0;
-        }
-        else if(maxSession < minScaleLimit){
+        if(maxSession < minScaleLimit){
             updateScale(minScaleLimit);
         }           
         else if (maxSession - sessionCount == 0) { // no available nodes
