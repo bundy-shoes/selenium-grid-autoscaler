@@ -122,18 +122,20 @@ public class GridConsoleService {
     public JSONArray getNodes(JSONObject obj) {
         JSONArray nodes = new JSONArray();
         try {
-            nodes = obj.getJSONObject("data").getJSONObject("nodesInfo").getJSONArray("nodes");
+            nodes = obj.getJSONArray("nodes");
         } catch (Exception e) {
             logger.error(String.format("#GridConsoleStatus, getNodes %s", e.getMessage()));
         }
         return nodes;
     }
 
+     
     public GridConsoleStatus getStatus() throws IOException {
         GridConsoleStatus status = new GridConsoleStatus();
         try {
             JSONObject json = new JSONObject();
-            String grapql = "query GetNodes {    nodesInfo {      nodes {        id        uri        status        maxSession        slotCount        sessions {          id          capabilities          startTime          uri          nodeId          nodeUri          sessionDurationMillis          slot {            id            stereotype            lastStarted          }        }        sessionCount        stereotypes        version        osInfo {          arch          name          version        }      }      __typename    }    __typename  }";
+            String grapql = "query GetNodes {      grid {        uri        totalSlots        nodeCount        maxSession        sessionCount        version        sessionQueueSize    }  nodesInfo {      nodes {        id        uri        status        maxSession        slotCount        sessions {          id          capabilities          startTime          uri          nodeId          nodeUri          sessionDurationMillis          slot {            id            stereotype            lastStarted          }        }        sessionCount        stereotypes        version        osInfo {          arch          name          version        }      }      __typename    }    __typename  }";
+
             json.put("query", grapql);
             json.put("variables", new JSONObject());
             RequestBody body = RequestBody.create(null, json.toString());
@@ -141,55 +143,32 @@ public class GridConsoleService {
                     .header("Content-Type", "application/json").post(body).build();
             Call call = httpClient.newCall(r);
             Response response = call.execute();
-            String jsonString = response.body().string();
-            JSONObject jsonObject = new JSONObject(jsonString);
-            JSONArray nodes = getNodes(jsonObject);
-            int sessionCount = 0;
-            int maxSession = 0;
-            int slotCount = 0;
+            String root = response.body().string();
+            JSONObject data = new JSONObject(root).getJSONObject("data");
+
+            JSONObject grid = data.getJSONObject("grid");
+            JSONObject nodesInfo = data.getJSONObject("nodesInfo");
+
+            status.setSessionCount(Integer.parseInt(grid.get("sessionCount").toString()));
+            status.setMaxSession(Integer.parseInt(grid.get("maxSession").toString()));
+            status.setTotalSlots(Integer.parseInt(grid.get("totalSlots").toString()));
+            status.setSessionQueueSize(Integer.parseInt(grid.get("sessionQueueSize").toString()));
+            JSONArray nodes = getNodes(nodesInfo);
             for (Object nodeIter : nodes) {
                 if (nodeIter instanceof JSONObject) {
                     JSONObject node = (JSONObject) nodeIter;
                     String nodeUri = node.get("uri").toString();
-                    String nodeId = node.get("id").toString();
-                    Response nodeHealthCheck = checkNodeStatus(nodeUri);
-                    if (nodeHealthCheck == null) {
-                        status.addDeadNode(nodeId);
-                    }
                     JSONArray sessions = node.getJSONArray("sessions");
                     sessions.forEach(sessionIter -> {
                         JSONObject session = (JSONObject) sessionIter;
                         String sessionId = session.get("id").toString();
-                        String startTimeStr = session.get("startTime").toString();
-                        try {
-                            SimpleDateFormat isoFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-                            Calendar c = Calendar.getInstance();
-                            LocalDateTime dt = LocalDateTime.now();
-                            TimeZone tz = c.getTimeZone();
-                            ZoneId zone = tz.toZoneId();
-                            ZonedDateTime zdt = dt.atZone(zone);
-                            ZoneOffset offset = zdt.getOffset();
-                            int totalMilliSeconds = 1000 * offset.getTotalSeconds();
-                            Date startTime = isoFormat.parse(startTimeStr);
-                            Date now = new Date();
-                            Long diff = Math.abs(now.getTime() - startTime.getTime()) - totalMilliSeconds;
-                            if (diff > MAX_SESSION_TIMEOUT) {
-                                status.addTimeoutSessions(nodeUri, sessionId);
-                            }
-                            logger.info(String.format("diff: %s", diff / 1000 / 60));
-                        } catch (ParseException e) {
-                            e.printStackTrace();
+                        int sessionDurationMillis = Integer.parseInt(session.get("sessionDurationMillis").toString()); 
+                        if (sessionDurationMillis > MAX_SESSION_TIMEOUT) {
+                            status.addTimeoutSessions(nodeUri, sessionId);
                         }
                     });
-                    sessionCount += (int) node.get("sessionCount");
-                    slotCount += (int) node.get("slotCount");
-                    maxSession += (int) node.get("maxSession");
                 }
-            }
-
-            status.setSessionCount(sessionCount);
-            status.setMaxSession(maxSession);
-            status.setSlotCount(slotCount);
+            }           
         } catch (Exception e) {
             logger.error(String.format("#GridConsoleStatus, getStatus %s", e.getMessage()));
         }

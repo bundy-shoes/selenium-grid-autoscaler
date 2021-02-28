@@ -23,7 +23,7 @@ public class K8sAutoScaleSchedule {
         try {
             GridConsoleStatus status = service.getStatus();
             service.utilize(status);
-            podScalingService.adjustScale(status);
+            podScalingService.adjustScale(5000, status);
         } catch (Exception e) {
             logger.error("Error in running checkAndAutoScale scheduler: {}", e);
         }

@@ -22,19 +22,17 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class PodScalingService {
-    private static final TrustManager[] UNQUESTIONING_TRUST_MANAGER = new TrustManager[]{
-        new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() {
-                return null;
-            }
-
-            public void checkClientTrusted(X509Certificate[] certs, String authType) {
-            }
-
-            public void checkServerTrusted(X509Certificate[] certs, String authType) {
-            }
+    private static final TrustManager[] UNQUESTIONING_TRUST_MANAGER = new TrustManager[] { new X509TrustManager() {
+        public X509Certificate[] getAcceptedIssuers() {
+            return null;
         }
-    };
+
+        public void checkClientTrusted(X509Certificate[] certs, String authType) {
+        }
+
+        public void checkServerTrusted(X509Certificate[] certs, String authType) {
+        }
+    } };
     private static final Logger logger = LoggerFactory.getLogger(PodScalingService.class);
     @Value("${gridUrl}")
     private String gridUrl;
@@ -46,17 +44,26 @@ public class PodScalingService {
     private int minScaleLimit;
     @Value("${k8s_token}")
     private String k8sToken;
+
+    @Value("${scale_up_timeout}")
+    private int scaleUpTimeout;
+
+    private int upCounter = 0;
+    private int downCounter = 0;
+
+    @Value("${scale_down_timeout}")
+    private int scaleDownTimeout;
+
     @Autowired
     private GridConsoleService gridStatusService;
     private OkHttpClient httpClient;
 
     @PostConstruct
-    private void init() throws NoSuchAlgorithmException, KeyManagementException {   
-        logger.info("Grid Console URL: {}", gridUrl);    
+    private void init() throws NoSuchAlgorithmException, KeyManagementException {
+        logger.info("Grid Console URL: {}", gridUrl);
         logger.info("K8s API URL: {}", k8sApiUrl);
         logger.info("K8s API Token: {}", k8sToken);
 
-        
         httpClient = new OkHttpClient();
         SSLContext sc = SSLContext.getInstance("SSL");
         sc.init(null, UNQUESTIONING_TRUST_MANAGER, null);
@@ -66,9 +73,13 @@ public class PodScalingService {
 
     private void updateScale(int scaledValue) throws IOException, InterruptedException {
         if (scaledValue > maxScaleLimit)
-            logger.warn("Scale required {} which is more than the max scale limit of {}. Hence no auto-scaling is performed.", scaledValue, maxScaleLimit);
+            logger.warn(
+                    "Scale required {} which is more than the max scale limit of {}. Hence no auto-scaling is performed.",
+                    scaledValue, maxScaleLimit);
         else if (scaledValue < minScaleLimit)
-            logger.warn("Scale required {} which is less than the min scale limit of {}. Hence no auto-scaling is performed.", scaledValue, minScaleLimit);
+            logger.warn(
+                    "Scale required {} which is less than the min scale limit of {}. Hence no auto-scaling is performed.",
+                    scaledValue, minScaleLimit);
         else {
             scale(scaledValue);
         }
@@ -77,17 +88,13 @@ public class PodScalingService {
     private void scale(int scaledValue) throws IOException, InterruptedException {
         MediaType JSON = MediaType.parse("application/strategic-merge-patch+json");
         String payload = String.format("{ \"spec\": { \"replicas\": %s } }", scaledValue);
-        
+
         logger.info(String.format("url: %s", k8sApiUrl));
         RequestBody body = RequestBody.create(JSON, payload);
-          
-        Request r = new Request.Builder()
-                .url(k8sApiUrl)
-                .header("Authorization", "Bearer " + k8sToken)
-                .header("Accept", "application/json")
-                .header("Content-Type", "application/strategic-merge-patch+json")
-                .patch(body)
-                .build();
+
+        Request r = new Request.Builder().url(k8sApiUrl).header("Authorization", "Bearer " + k8sToken)
+                .header("Accept", "application/json").header("Content-Type", "application/strategic-merge-patch+json")
+                .patch(body).build();
         Call call = httpClient.newCall(r);
         Response response = call.execute();
         if (response.code() != 200)
@@ -108,34 +115,33 @@ public class PodScalingService {
             waitForScaleToHappen(scaledValue);
     }
 
-    public void adjustScale(GridConsoleStatus gridStatus) throws IOException, InterruptedException {
+    public void adjustScale(long initialDelay, GridConsoleStatus gridStatus) throws IOException, InterruptedException {
         logger.debug("Let's check if auto-scaling is required...");
-        //int totalRunningNodes = gridStatus.getAvailableNodesCount() + gridStatus.getBusyNodesCount();
-        //int queuedRequests = gridStatus.getWaitingRequestsCount();
-        //int currentScale = getScale();
-        //int requiredScale;
-        //if (queuedRequests > 0) {
-        //    requiredScale = totalRunningNodes + queuedRequests;
-        //    logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
-        // } else if (totalRunningNodes < minScaleLimit) {
-        //     requiredScale = minScaleLimit;
-        //     logger.info("Scale up is required. Current scale: {} and required scale: {}", currentScale, requiredScale);
-        // } else if (totalRunningNodes > minScaleLimit && gridStatus.getBusyNodesCount() == 0) {
-        //     logger.info("Scale down is required. Current available scale: {} and minimum required scale: {}", currentScale, minScaleLimit);
-        //     requiredScale = minScaleLimit;
-        // } else {
-        //     logger.debug("No scaling is required..");
-        //     return;
-        // }
-        int maxSession=gridStatus.getMaxSession();
-        int sessionCount=gridStatus.getSessionCount();
-        int scale = minScaleLimit;
-
-        if(maxSession - sessionCount == 0) {
-            scale = maxSession+1;
-            updateScale(scale);
+        int maxSession = gridStatus.getMaxSession();
+        int sessionCount = gridStatus.getSessionCount();
+        int sessionQueueSize = gridStatus.getSessionQueueSize();
+        if (maxSession == minScaleLimit){
+            upCounter = 0;
+            downCounter = 0;
         }
-        return;    
+        else if(maxSession < minScaleLimit){
+            updateScale(minScaleLimit);
+        }           
+        else if (maxSession - sessionCount == 0) { // no available nodes
+            downCounter = 0;
+            if (sessionQueueSize > 0) { // requests are waiting in queue
+                if (upCounter++ == Math.round(scaleUpTimeout / initialDelay)) {
+                    upCounter = 0;                    
+                    updateScale(maxSession+1);
+                }
+            }
+        } else if (sessionQueueSize == 0) { // no requests are waiting in queue
+            upCounter = 0;
+            if (downCounter++ == Math.round(scaleDownTimeout / initialDelay)) {
+                downCounter = 0;                
+                updateScale(Math.max(minScaleLimit, maxSession-1));
+            }
+        }        
     }
 
     public void cleanUp() throws IOException, InterruptedException {
@@ -149,16 +155,13 @@ public class PodScalingService {
         int existingScale = gridStatus.getMaxSession();
         while (existingScale != scale) {
             int pollingTime = 5;
-            logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}", pollingTime, existingScale, scale);
+            logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}",
+                    pollingTime, existingScale, scale);
             TimeUnit.SECONDS.sleep(pollingTime);
             gridStatus = gridStatusService.getStatus();
             existingScale = gridStatus.getMaxSession();
         }
         logger.info("Selenium Grid is successfully scaled to {}", scale);
     }
-
-
-
-	
 
 }

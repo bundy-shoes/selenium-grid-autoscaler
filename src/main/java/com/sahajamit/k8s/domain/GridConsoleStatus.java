@@ -13,7 +13,8 @@ public class GridConsoleStatus {
 	
 	private int sessionCount;
     private int maxSession;
-    private int slotCount;
+    private int totalSlots;
+	private int sessionQueueSize;
 
 	private List<String> deadNodes = new ArrayList<String>();
 
@@ -55,16 +56,24 @@ public class GridConsoleStatus {
 		maxSession = _maxSession;
 	}
 
-	public void setSlotCount(int _slotCount) {
-		slotCount = _slotCount;
+	public void setTotalSlots(int _totalSlots) {
+		totalSlots = _totalSlots;
 	}
 
-	public int getSlotCount() {
-		return slotCount;
+	public int getTotalSlots() {
+		return totalSlots;
 	}
     // private int availableNodesCount;
     // private int busyNodesCount;
     // private int waitingRequestsCount;
+
+	public int getSessionQueueSize() {
+		return sessionQueueSize;
+	}
+	
+	public void setSessionQueueSize(int _sessionQueueSize) {
+		sessionQueueSize = _sessionQueueSize;
+	}
     
 	// public void setAvailableNodesCount(int _availableNodesCount) {
     //     this.availableNodesCount=_availableNodesCount;
