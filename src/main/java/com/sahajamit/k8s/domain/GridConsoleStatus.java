@@ -35,9 +35,9 @@ public class GridConsoleStatus {
 		return deadNodes;
 	}
 
-	public boolean addDeadNode(String _nodeUri) {
-		if(deadNodes.contains(_nodeUri)) return false;
-		return deadNodes.add(_nodeUri);			
+	public boolean addDeadNode(String _nodeId) {
+		if(deadNodes.contains(_nodeId)) return false;
+		return deadNodes.add(_nodeId);			
 	}
  
 	public int getSessionCount() {

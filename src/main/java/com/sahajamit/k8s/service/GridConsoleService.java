@@ -60,7 +60,8 @@ public class GridConsoleService {
             Request r = new Request.Builder().url(gridUrl).header("X-REGISTRATION-SECRET", "").delete().build();
             logger.info(String.format("terminating node, %s", nodeId));
             response = httpClient.newCall(r).execute();
-            logger.info(String.format("node %s terminated", nodeId));
+            if (response.code() == 200) logger.info(String.format("node %s terminated", nodeId));
+            else if (response.code() == 404) logger.info(String.format("node %s is missing", nodeId));
         } catch (Exception e) {
             logger.error(String.format("#GridConsoleStatus, deleteNode %s", e.getMessage()));
         }
@@ -139,20 +140,25 @@ public class GridConsoleService {
             JSONObject grid = data.getJSONObject("grid");
             JSONObject nodesInfo = data.getJSONObject("nodesInfo");
 
-            status.setSessionCount(Integer.parseInt(grid.get("sessionCount").toString()));
-            status.setMaxSession(Integer.parseInt(grid.get("maxSession").toString()));
-            status.setTotalSlots(Integer.parseInt(grid.get("totalSlots").toString()));
-            status.setSessionQueueSize(Integer.parseInt(grid.get("sessionQueueSize").toString()));
+            status.setSessionCount(grid.getInt("sessionCount"));
+            status.setMaxSession(grid.getInt("maxSession"));
+            status.setTotalSlots(grid.getInt("totalSlots"));
+            status.setSessionQueueSize(grid.getInt("sessionQueueSize"));
             JSONArray nodes = getNodes(nodesInfo);
             for (Object nodeIter : nodes) {
                 if (nodeIter instanceof JSONObject) {
                     JSONObject node = (JSONObject) nodeIter;
-                    String nodeUri = node.get("uri").toString();
+                    String nodeUri = node.getString("uri");
+                    String nodeId = node.getString("id");
+                    Response healthCheck = checkNodeStatus(nodeUri);
+                    if(healthCheck == null) {
+                        status.addDeadNode(nodeId);
+                    }
                     JSONArray sessions = node.getJSONArray("sessions");
                     sessions.forEach(sessionIter -> {
                         JSONObject session = (JSONObject) sessionIter;
-                        String sessionId = session.get("id").toString();
-                        int sessionDurationMillis = Integer.parseInt(session.get("sessionDurationMillis").toString()); 
+                        String sessionId = session.getString("id");
+                        long sessionDurationMillis = session.getLong("sessionDurationMillis"); 
                         if (sessionDurationMillis > MAX_SESSION_TIMEOUT) {
                             status.addTimeoutSessions(nodeUri, sessionId);
                         }

@@ -26,7 +26,7 @@ public class K8sAutoScaleSchedule {
         }
     }
 
-    @Scheduled(fixedDelayString = "${grid_utilize_check_frequency_in_sec:10}000", initialDelay = 30000)
+    @Scheduled(fixedDelayString = "${grid_utilize_check_frequency_in_sec:10}000", initialDelay = 5000)
     public synchronized void checkAndUtilize() {
         try {
             service.utilize(service.getStatus());
