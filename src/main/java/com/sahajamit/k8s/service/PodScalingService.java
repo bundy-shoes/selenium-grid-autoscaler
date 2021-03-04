@@ -7,7 +7,6 @@ import com.squareup.okhttp.Request.Builder;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -56,7 +55,6 @@ public class PodScalingService {
     @Value("${scale_down_timeout}")
     private int scaleDownTimeout;
 
-    @Autowired
     private OkHttpClient httpClient;
 
     @PostConstruct
@@ -118,21 +116,40 @@ public class PodScalingService {
             waitForScaleToHappen(getScale, scaledValue);
     }
 
-    public void adjustScale(long initialDelay, GridConsoleStatus gridStatus) throws IOException, InterruptedException {
+    public void adjustScale(long cycle_time, GridConsoleStatus gridStatus) throws IOException, InterruptedException {
         logger.debug("Let's check if auto-scaling is required...");
         int maxSession = gridStatus.getMaxSession();
         int sessionCount = gridStatus.getSessionCount();
         int sessionQueueSize = gridStatus.getSessionQueueSize();
-
+        int maxUpTimeIterations = Math.round(scaleUpTimeout / cycle_time);
+        int maxDownTimeIterations = Math.round(scaleDownTimeout / cycle_time);
+       
         if (maxSession < minScaleLimit) {
             updateScale(minScaleLimit);
             return;
         }
 
-        if (maxSession - sessionCount == 0) { // no available nodes
+        //no demand so supply minimum or downgrade
+        if (sessionQueueSize == 0) { // no requests are waiting in queue
+            if(maxSession > sessionCount + minScaleLimit){
+                upCounter = 0; // init upscale count
+                downCounter = downCounter + 1;
+                logger.info("down counter {}", downCounter);
+                if (downCounter >= maxDownTimeIterations) {
+                    downCounter = 0;
+                    logger.info("Scaling Down");
+                    updateScale(Math.max(minScaleLimit, maxSession - 1));
+                }                
+            }
+            return;           
+        }
+        //demand is higher then supply
+        if (maxSession - sessionCount == 0) {
             downCounter = 0; // init downscale count
             if (sessionQueueSize > 0) { // requests are waiting in queue
-                if (++upCounter >= Math.round(scaleUpTimeout / initialDelay)) {
+                upCounter = upCounter + 1;
+                logger.info("up counter {}", downCounter);
+                if (upCounter >= maxUpTimeIterations) {
                     upCounter = 0;
                     logger.info("Scaling Up");
                     updateScale(maxSession + 1);
@@ -140,15 +157,7 @@ public class PodScalingService {
                 }
             }
         }
-        if (sessionQueueSize == 0) { // no requests are waiting in queue
-            upCounter = 0; // init upscale count
-            if (++downCounter >= Math.round(scaleDownTimeout / initialDelay)) {
-                downCounter = 0;
-                logger.info("Scaling Down");
-                updateScale(Math.max(minScaleLimit, maxSession - 1));
-                return;
-            }
-        }
+        
     }
 
     public void cleanUp() throws IOException, InterruptedException {
@@ -175,8 +184,7 @@ public class PodScalingService {
             JSONObject status = jsonObject.getJSONObject("status");        
             existingScale = status.getInt("replicas");            
             logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}", pollingTime, existingScale, scale);            
-        } while((existingScale != scale) && (--counter > 0));
-     
+        } while((existingScale != scale) && (--counter > 0));     
         boolean verify = (existingScale == scale);
         String message = verify ? "Selenium Grid is successfully scaled from {} to {}" : "Selenium Grid failed scaling from {} to {}";                         
         logger.info(message, existingScale, scale);

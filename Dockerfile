@@ -1,19 +1,19 @@
 FROM maven:3.6.1-jdk-8-alpine AS MAVEN_BUILD
 
 # copy the pom and src code to the container
-COPY ./ ./
+#COPY ./ ./
 
 # package our application code
-RUN mvn clean package
+#RUN mvn clean package
 
-RUN ls /
+#RUN ls /
 
 # the second stage of our build will use open jdk 8 on alpine 3.9
 FROM openjdk:8-jre-alpine3.9
 
-COPY --from=MAVEN_BUILD ./target/*.jar app/grid-utils.jar
-
-WORKDIR app
+#COPY --from=MAVEN_BUILD ./target/*.jar app/grid-utils.jar
+COPY ./target/*.jar app/grid-utils.jar
+WORKDIR /app
 
 # copy only the artifacts we need from the first stage and discard the rest
 
