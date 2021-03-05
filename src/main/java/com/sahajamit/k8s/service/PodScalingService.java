@@ -111,7 +111,8 @@ public class PodScalingService {
             updatedScale = 0;
 
         if (updatedScale != scaledValue)
-            throw new RuntimeException(String.format("Error in scaling. Here is the json response: %s", responseString));
+            throw new RuntimeException(
+                    String.format("Error in scaling. Here is the json response: %s", responseString));
         else
             waitForScaleToHappen(getScale, scaledValue);
     }
@@ -123,15 +124,15 @@ public class PodScalingService {
         int sessionQueueSize = gridStatus.getSessionQueueSize();
         int maxUpTimeIterations = Math.round(scaleUpTimeout / cycle_time);
         int maxDownTimeIterations = Math.round(scaleDownTimeout / cycle_time);
-       
+
         if (maxSession < minScaleLimit) {
             updateScale(minScaleLimit);
             return;
         }
 
-        //no demand so supply minimum or downgrade
+        // no demand so supply minimum or downgrade
         if (sessionQueueSize == 0) { // no requests are waiting in queue
-            if(maxSession > sessionCount + minScaleLimit){
+            if ((maxSession - 1 >= minScaleLimit) && (maxSession - sessionCount > 0)) {
                 upCounter = 0; // init upscale count
                 downCounter = downCounter + 1;
                 logger.info("down counter {}", downCounter);
@@ -139,11 +140,11 @@ public class PodScalingService {
                     downCounter = 0;
                     logger.info("Scaling Down");
                     updateScale(Math.max(minScaleLimit, maxSession - 1));
-                }                
+                }
             }
-            return;           
+            return;
         }
-        //demand is higher then supply
+        // demand is higher then supply
         if (maxSession - sessionCount == 0) {
             downCounter = 0; // init downscale count
             if (sessionQueueSize > 0) { // requests are waiting in queue
@@ -157,7 +158,6 @@ public class PodScalingService {
                 }
             }
         }
-        
     }
 
     public void cleanUp() throws IOException, InterruptedException {
@@ -166,27 +166,29 @@ public class PodScalingService {
         scale(minScaleLimit);
     }
 
-    private void waitForScaleToHappen(Request getScale, int scale) throws IOException, InterruptedException {        
-        int existingScale = scale - 1;   
-        Response response = null;    
-        int pollingTime = 5; 
+    private void waitForScaleToHappen(Request getScale, int scale) throws IOException, InterruptedException {
+        int existingScale = scale - 1;
+        Response response = null;
+        int pollingTime = 5;
         int counter = 20;
-        do  {
+        do {
             TimeUnit.SECONDS.sleep(pollingTime);
-            Call call = httpClient.newCall(getScale);    
-            response = call.execute();        
-            if (response != null && response.code() != 200){
+            Call call = httpClient.newCall(getScale);
+            response = call.execute();
+            if (response != null && response.code() != 200) {
                 String message = response.body().string();
-                throw new RuntimeException(String.format("Error while fetching current scale from grid: %s", message));  
-            }      
+                throw new RuntimeException(String.format("Error while fetching current scale from grid: %s", message));
+            }
             String responseString = response.body().string();
             JSONObject jsonObject = new JSONObject(responseString);
-            JSONObject status = jsonObject.getJSONObject("status");        
-            existingScale = status.getInt("replicas");            
-            logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}", pollingTime, existingScale, scale);            
-        } while((existingScale != scale) && (--counter > 0));     
+            JSONObject status = jsonObject.getJSONObject("status");
+            existingScale = status.getInt("replicas");
+            logger.info("Sleeping {} seconds for scaling to happen. Current scale: {} and required scale: {}",
+                    pollingTime, existingScale, scale);
+        } while ((existingScale != scale) && (--counter > 0));
         boolean verify = (existingScale == scale);
-        String message = verify ? "Selenium Grid is successfully scaled from {} to {}" : "Selenium Grid failed scaling from {} to {}";                         
+        String message = verify ? "Selenium Grid is successfully scaled from {} to {}"
+                : "Selenium Grid failed scaling from {} to {}";
         logger.info(message, existingScale, scale);
     }
 
