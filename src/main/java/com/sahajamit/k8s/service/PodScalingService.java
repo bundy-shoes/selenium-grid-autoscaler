@@ -128,11 +128,11 @@ public class PodScalingService {
         if (maxSession < minScaleLimit) {
             updateScale(minScaleLimit);
             return;
-        }
-
+        } 
+        int idleNodes = maxSession - sessionCount;
         // no demand so supply minimum or downgrade
         if (sessionQueueSize == 0) { // no requests are waiting in queue
-            if ((maxSession - 1 >= minScaleLimit) && (maxSession - sessionCount > 0)) {
+            if ((maxSession > minScaleLimit && idleNodes > 0)) {
                 upCounter = 0; // init upscale count
                 downCounter = downCounter + 1;
                 logger.info("down counter {}", downCounter);
@@ -140,12 +140,16 @@ public class PodScalingService {
                     downCounter = 0;
                     logger.info("Scaling Down");
                     updateScale(Math.max(minScaleLimit, maxSession - 1));
+                    return;
                 }
+            }
+            else{
+                downCounter = 0;
             }
             return;
         }
         // demand is higher then supply
-        if (maxSession - sessionCount == 0) {
+        if (idleNodes == 0) {
             downCounter = 0; // init downscale count
             if (sessionQueueSize > 0) { // requests are waiting in queue
                 upCounter = upCounter + 1;
@@ -156,6 +160,8 @@ public class PodScalingService {
                     updateScale(maxSession + 1);
                     return;
                 }
+            }else{
+                upCounter = 0;
             }
         }
     }
